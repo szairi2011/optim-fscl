@@ -72,6 +72,18 @@ plafond_reduction_pct = st.sidebar.number_input(
     "Plafond réduction (% de l'IRPP brut)", value=round(PARAMETRES_DEFAUT.plafond_reduction_pct * 100, 2), step=1.0, format="%.2f"
 )
 
+# ── Frais Administratifs ────────────────────────────────────
+# Facturés EN SUS du CA HT au client : honoraires expert-comptable,
+# frais bancaires, assurances professionnelles, etc.
+st.sidebar.subheader("🗂️ Frais Administratifs (Partie 2)")
+frais_admin = st.sidebar.number_input(
+    "Frais admin annuels (TND)",
+    value=PARAMETRES_DEFAUT.frais_admin_annuel,
+    step=100.0,
+    format="%.2f",
+    help="Ex : honoraires expert-comptable, frais bancaires, assurance professionnelle, abonnements logiciels.",
+)
+
 # ── TVA ──────────────────────────────────────────────────────
 st.sidebar.subheader("💳 TVA")
 taux_tva_pct = st.sidebar.number_input("Taux TVA (%)", value=round(PARAMETRES_DEFAUT.taux_tva * 100, 2), step=0.5, format="%.2f")
@@ -138,6 +150,7 @@ if st.button("🚀 Calculer", type="primary", use_container_width=True):
                 montant_assurance_vie=montant_av,
                 taux_reduction_assurance=taux_reduction_av_pct / 100,
                 plafond_reduction_pct=plafond_reduction_pct / 100,
+                frais_admin_annuel=frais_admin,
                 taux_tva=taux_tva_pct / 100,
             )
             bareme = dataframe_vers_bareme(st.session_state.bareme_df)
@@ -190,16 +203,21 @@ if st.button("🚀 Calculer", type="primary", use_container_width=True):
 
     with col2:
         st.markdown("### 📄 Partie 2 — Facturation")
+        frais_admin_mensuel = parametres.frais_admin_annuel / 12
+        montant_facture_mensuel = r.partie2.brut_ou_ca_ht_mensuel + frais_admin_mensuel
+        montant_facture_annuel = r.partie2.brut_ou_ca_ht_annuel + parametres.frais_admin_annuel
         st.markdown(f"""
-**CA HT mensuel :** {r.partie2.brut_ou_ca_ht_mensuel:.2f} TND  
-**CA HT annuel :** {r.partie2.brut_ou_ca_ht_annuel:.2f} TND  
+**CA HT mensuel (base fiscale) :** {r.partie2.brut_ou_ca_ht_mensuel:.2f} TND  
+**CA HT annuel (base fiscale) :** {r.partie2.brut_ou_ca_ht_annuel:.2f} TND  
+**Frais admin facturés au client :** +{parametres.frais_admin_annuel:.2f} TND/an (+{frais_admin_mensuel:.2f} TND/mois)  
+**🧾 Total facturé au client HT :** {montant_facture_annuel:.2f} TND/an ({montant_facture_mensuel:.2f} TND/mois)  
 **TVA collectée ({taux_tva_pct:.0f}%) :** {r.tva_annuelle:.2f} TND/an  
 **CNSS forfaitaire :** -{r.partie2.cnss_annuel:.2f} TND/an  
 **Revenu imposable :** {r.partie2.revenu_imposable_annuel:.2f} TND/an  
 **IRPP net :** -{r.partie2.irpp_net_annuel:.2f} TND/an ({r.partie2.irpp_net_annuel / 12:.2f} TND/mois)  
 
 ✅ **Net mensuel :** {r.partie2.net_mensuel:.2f} TND  
-💰 **Montant à facturer HT :** {r.partie2.brut_ou_ca_ht_mensuel:.2f} TND/mois
+💰 **Coût entreprise :** {r.partie2.cout_entreprise_mensuel:.2f} TND/mois
 """)
 
     st.markdown("---")
@@ -245,7 +263,9 @@ if st.button("🚀 Calculer", type="primary", use_container_width=True):
         "Catégorie": [
             "Salaire Brut",
             "CNSS Salaire",
-            "CA HT Facturé",
+            "CA HT base Partie 2",
+            "Frais Admin (facturés client)",
+            "Total facturé client HT (P2)",
             "CNSS Forfaitaire",
             "Revenu Imposable Total",
             "IRPP Brut",
@@ -258,6 +278,8 @@ if st.button("🚀 Calculer", type="primary", use_container_width=True):
             f"{r.partie1.brut_ou_ca_ht_annuel:.2f}",
             f"-{r.partie1.cnss_annuel:.2f}",
             f"{r.partie2.brut_ou_ca_ht_annuel:.2f}",
+            f"+{parametres.frais_admin_annuel:.2f}",
+            f"{r.partie2.brut_ou_ca_ht_annuel + parametres.frais_admin_annuel:.2f}",
             f"-{r.partie2.cnss_annuel:.2f}",
             f"{r.revenu_imposable_total:.2f}",
             f"{r.irpp_brut_total:.2f}",
@@ -270,6 +292,8 @@ if st.button("🚀 Calculer", type="primary", use_container_width=True):
             f"{r.partie1.brut_ou_ca_ht_mensuel:.2f}",
             f"-{r.partie1.cnss_annuel / 12:.2f}",
             f"{r.partie2.brut_ou_ca_ht_mensuel:.2f}",
+            f"+{parametres.frais_admin_annuel / 12:.2f}",
+            f"{(r.partie2.brut_ou_ca_ht_annuel + parametres.frais_admin_annuel) / 12:.2f}",
             f"-{r.partie2.cnss_annuel / 12:.2f}",
             f"{r.revenu_imposable_total / 12:.2f}",
             f"{r.irpp_brut_total / 12:.2f}",

@@ -100,6 +100,17 @@ class ParametresFiscaux(BaseModel):
         description="Plafond de la réduction en % de l'IRPP brut (règle des 55%)"
     )
 
+    # ── Frais Administratifs ────────────────────────────────────────────────
+    # Frais de gestion (honoraires comptable, frais bancaires, assurances pro, etc.)
+    # facturés EN SUS du CA HT au client.
+    # Le gérant récupère ainsi ces charges via la facture :
+    #   Montant facturé total (HT) = CA HT (base fiscale) + frais_admin
+    # Le revenu imposable P2 reste : CA HT − CNSS forfaitaire.
+    frais_admin_annuel: float = Field(
+        0.0, ge=0,
+        description="Frais administratifs annuels Partie 2 (comptable, banque, etc.) en TND — facturés en sus au client"
+    )
+
     # ── TVA ─────────────────────────────────────────────────────────────────
     taux_tva: float = Field(
         0.19, ge=0,
@@ -294,12 +305,14 @@ def calculer_repartition(demande: DemandeCalcul) -> ResultatRepartition:
         Coût entreprise P1 = Brut × (1 + charges_patronales)
 
     Partie 2 (Facturation — gérant non-salarié) :
-        CA HT P2
+        CA HT P2 (base fiscale)
           − CNSS forfaitaire annuelle
           = Revenu imposable P2
           − Quote-part IRPP net P2
           = Net P2
-        Coût entreprise P2 = CA HT (versé directement par la société)
+        Frais admin : facturés EN SUS au client (hors calcul fiscal)
+        Montant total facturé HT = CA HT + frais admin
+        Coût entreprise P2 = CA HT + frais admin
 
     IRPP :
         Calculé sur le revenu imposable TOTAL (P1 + P2 cumulés).
@@ -341,7 +354,9 @@ def calculer_repartition(demande: DemandeCalcul) -> ResultatRepartition:
         cnss_annuel_p1 = brut_annuel_p1 * p.taux_cnss_salarie
         revenu_imposable_p1 = brut_annuel_p1 - cnss_annuel_p1
 
-        # Partie 2 — CNSS forfaitaire déduite du CA HT
+        # Partie 2 — seule la CNSS forfaitaire est déduite du CA HT.
+        # Les frais admin sont facturés EN SUS au client ; ils n'entrent pas
+        # dans la base imposable (le CA HT est déjà le revenu net de l'activité).
         revenu_imposable_p2 = ca_ht_annuel_p2 - p.cnss_forfaitaire_annuel
 
         # IRPP calculé sur le revenu TOTAL combiné
@@ -437,8 +452,9 @@ def calculer_repartition(demande: DemandeCalcul) -> ResultatRepartition:
 
     # Coût entreprise P1 = brut + charges patronales
     cout_entreprise_annuel_p1 = brut_annuel_p1 * (1 + p.charges_patronales)
-    # Coût entreprise P2 = CA HT (la société règle directement)
-    cout_entreprise_annuel_p2 = ca_ht_annuel_p2
+    # Coût entreprise P2 = CA HT + frais admin
+    # (la société avance les deux ; les frais admin sont couverts par la facturation au client)
+    cout_entreprise_annuel_p2 = ca_ht_annuel_p2 + p.frais_admin_annuel
 
     # TVA collectée (non incluse dans le revenu net — transitoire pour l'État)
     tva_annuelle = ca_ht_annuel_p2 * p.taux_tva
